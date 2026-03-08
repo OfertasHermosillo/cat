@@ -320,12 +320,12 @@ window._fbGet = (path) => get(ref(db,path));
 
 async function init(){
   try{
-    const snap = await window._fbGet('/');
-    if(snap.exists()){
-      const d = snap.val();
-      if(d.config) window._cfg = {...window._cfg,...d.config};
-      if(d.products) window._prods = Object.values(d.products);
-    }
+    const [cfgSnap, prodsSnap] = await Promise.all([
+      window._fbGet('/config'),
+      window._fbGet('/products')
+    ]);
+    if(cfgSnap.exists()) window._cfg = {...window._cfg,...cfgSnap.val()};
+    if(prodsSnap.exists()) window._prods = Object.values(prodsSnap.val());
   }catch(e){console.error(e);}
   document.getElementById('loading').style.display='none';
   document.getElementById('shopName').textContent = window._cfg.shopName||'Mi Tienda';
