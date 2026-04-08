@@ -165,6 +165,17 @@ hr{border:none;border-top:1px solid var(--border);margin-top:18px;}
 /* BADGES */
 .badge-overlay{position:absolute;bottom:10px;left:8px;right:8px;display:flex;flex-wrap:wrap;gap:5px;z-index:10;}
 .badge{background:rgba(230,81,0,.88);color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.2);white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.3);}
+
+.card.unavailable{opacity:.5;filter:grayscale(.6);}
+.card.unavailable .card-price::after{content:' · No disponible';color:#e74c3c;font-size:12px;font-weight:400;}
+.status-toggle{display:flex;align-items:center;gap:10px;margin-top:14px;padding:12px;background:var(--card);border-radius:10px;border:1px solid var(--border);}
+.status-toggle label{font-size:14px;font-weight:600;flex:1;}
+.toggle-switch{position:relative;width:48px;height:26px;flex-shrink:0;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:#555;border-radius:26px;cursor:pointer;transition:.3s;}
+.toggle-slider:before{content:'';position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.3s;}
+.toggle-switch input:checked + .toggle-slider{background:var(--accent);}
+.toggle-switch input:checked + .toggle-slider:before{transform:translateX(22px);}
 </style>
 </head>
 <body>
@@ -269,6 +280,14 @@ hr{border:none;border-top:1px solid var(--border);margin-top:18px;}
     <textarea id="pDesc" placeholder="Describe el producto..."></textarea>
     <label>Categoría</label>
     <select id="pCat"></select>
+    <div class="status-toggle">
+      <label>Estado del producto</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="pStatus" checked/>
+        <span class="toggle-slider"></span>
+      </label>
+      <span id="pStatusLabel" style="font-size:13px;color:var(--accent);min-width:80px">Disponible</span>
+    </div>
     <label>Disparadores psicológicos</label>
     <div id="badgeListForm" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
     <div style="display:flex;gap:8px">
@@ -407,7 +426,7 @@ function renderCatNav(){
 
 function renderGrid(){
   const grid=document.getElementById('grid');
-  const list=currentCat==='all'?window._prods:window._prods.filter(p=>p.cat===currentCat);
+  const list=(currentCat==='all'?window._prods:window._prods.filter(p=>p.cat===currentCat)).filter(p=>p.status!==false);
   if(!list.length){grid.innerHTML='<div class="empty"><span>🛍</span>No hay productos aún.<br>Usa ⚙ para agregar.</div>';return;}
   grid.innerHTML='';
   list.forEach(p=>{
@@ -439,6 +458,7 @@ function renderGrid(){
 function showDetail(p, pushHistory){
   document.getElementById('catalogView').classList.remove('active');
   document.getElementById('detailView').classList.add('active');
+  window.scrollTo(0,0);
   const imgs=p.images||[];
   dSlideIdx[p.id]=0;
 
@@ -592,7 +612,7 @@ function renderProdList(){
   if(!window._prods.length){el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:8px">Sin productos.</p>';return;}
   window._prods.forEach(p=>{
     const item=document.createElement('div');item.className='prod-item';
-    item.innerHTML=`<img src="${(p.images||[])[0]||''}" onerror="this.style.display='none'"/><div class="prod-item-info"><strong>${p.name}</strong><span>$${p.price} · ${p.cat||'Sin cat.'}</span></div><span style="color:var(--muted)">✏</span>`;
+    item.innerHTML=`<img src="${(p.images||[])[0]||''}" onerror="this.style.display='none'"/><div class="prod-item-info"><strong>${p.name}</strong><span>$${p.price} · ${p.cat||'Sin cat.'} ${p.status===false?'· <span style="color:#e74c3c">No disponible</span>':''}</span></div><span style="color:var(--muted)">✏</span>`;
     item.onclick=()=>openProductForm(p.id);
     el.appendChild(item);
   });
@@ -627,11 +647,13 @@ function openProductForm(id=null){
     document.getElementById('pPrice').value=p.price||'';
     document.getElementById('pDesc').value=p.desc||'';
     document.getElementById('pCat').value=p.cat||'';
+    const statusEl=document.getElementById('pStatus'); if(statusEl){statusEl.checked=p.status!==false; document.getElementById('pStatusLabel').textContent=p.status!==false?'Disponible':'No disponible'; document.getElementById('pStatusLabel').style.color=p.status!==false?'var(--accent)':'#e74c3c';}
     currentImages=[...(p.images||[])];
     currentBadges=[...(p.badges||[])];
   } else {
     ['pName','pPrice','pDesc'].forEach(i=>document.getElementById(i).value='');
     currentBadges=[];
+    const stEl=document.getElementById('pStatus'); if(stEl){stEl.checked=true; document.getElementById('pStatusLabel').textContent='Disponible'; document.getElementById('pStatusLabel').style.color='var(--accent)';}
     document.getElementById('pCat').value='';
   }
   renderImgPreviews();
@@ -675,7 +697,8 @@ async function saveProduct(){
   const price=document.getElementById('pPrice').value;
   if(!name||!price){showToast('Nombre y precio requeridos');return;}
   showToast('Guardando...');
-  const prod={id:editingId||'p'+Date.now(),name,price,desc:document.getElementById('pDesc').value.trim(),cat:document.getElementById('pCat').value,images:currentImages,badges:currentBadges};
+  const stEl2=document.getElementById('pStatus');
+  const prod={id:editingId||'p'+Date.now(),name,price,desc:document.getElementById('pDesc').value.trim(),cat:document.getElementById('pCat').value,images:currentImages,badges:currentBadges,status:stEl2?stEl2.checked:true};
   if(editingId){const idx=window._prods.findIndex(p=>p.id===editingId);window._prods[idx]=prod;}
   else{window._prods.push(prod);}
   await fbSave();
@@ -885,6 +908,13 @@ function showToast(msg){
 }
 
 window.onhashchange=handleHash;
+
+document.addEventListener('change', e=>{
+  if(e.target.id==='pStatus'){
+    document.getElementById('pStatusLabel').textContent = e.target.checked ? 'Disponible' : 'No disponible';
+    document.getElementById('pStatusLabel').style.color = e.target.checked ? 'var(--accent)' : '#e74c3c';
+  }
+});
 
 Object.assign(window,{goHome,goCat,openRelated,openWA,closeOrder,goStep,chooseDelivery,sendOrderWA,addBadge,removeBadge,addCustomBadge,removeCustomBadge,askPass,closePass,checkPass,openAdmin,closeAdmin,addCategory,removeCategory,saveConfig,openProductForm,closeProductForm,handleImages,removeImg,saveProduct,deleteProduct,dGoSlide,dSetSlide,shareLink});
 </script>
