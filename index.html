@@ -142,7 +142,9 @@ textarea{resize:vertical;min-height:80px;}
 .btn-save{flex:1;background:var(--accent);color:#000;border:none;padding:12px;border-radius:9px;font-weight:700;cursor:pointer;font-size:14px;}
 .btn-cancel{background:var(--card);border:1px solid var(--border);color:var(--text);padding:12px 16px;border-radius:9px;cursor:pointer;font-size:14px;}
 .btn-del-prod{background:#c0392b;color:#fff;border:none;padding:12px 16px;border-radius:9px;cursor:pointer;font-size:14px;}
-.prod-list{margin-top:10px;max-height:200px;overflow-y:auto;}
+.prod-list{margin-top:10px;max-height:52vh;overflow-y:auto;}
+.prod-group-head{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface);padding:10px 8px;margin-top:4px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:var(--accent2);cursor:pointer;z-index:1;}
+.prod-group-n{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1px 9px;font-size:12px;color:var(--text);font-weight:600;}
 .prod-item{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;border:1px solid transparent;}
 .prod-item:hover{background:var(--card);border-color:var(--border);}
 .prod-item img{width:42px;height:42px;object-fit:cover;border-radius:6px;background:#111;}
@@ -283,7 +285,16 @@ hr{border:none;border-top:1px solid var(--border);margin-top:18px;}
     </div>
     <div id="customBadgeList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
     <hr/>
-    <h3 style="margin-top:16px;font-size:15px;color:var(--accent2)">Productos</h3>
+    <h3 style="margin-top:16px;font-size:15px;color:var(--accent2)">Productos <span id="prodCount" style="color:var(--muted);font-size:12px;font-weight:400"></span></h3>
+    <input type="text" id="prodSearch" placeholder="🔍 Buscar producto..." oninput="renderProdList()" style="margin-top:10px"/>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <select id="prodCatFilter" onchange="renderProdList()" style="flex:1"></select>
+      <select id="prodStatusFilter" onchange="renderProdList()" style="flex:none;width:auto">
+        <option value="">Todos</option>
+        <option value="on">Disponibles</option>
+        <option value="off">No disponibles</option>
+      </select>
+    </div>
     <div class="prod-list" id="prodList"></div>
     <button class="btn-save" style="margin-top:12px;width:100%" onclick="openProductForm()">+ Nuevo producto</button>
     <button class="btn-cancel" style="margin-top:8px;width:100%" onclick="migrateImages()">⚡ Optimizar fotos (carga más rápida)</button>
@@ -702,20 +713,59 @@ function addCategory(){
   const v=document.getElementById('newCatInput').value.trim();if(!v)return;
   if(!(window._cfg.categories||[]).includes(v))window._cfg.categories=[...(window._cfg.categories||[]),v];
   document.getElementById('newCatInput').value='';
-  renderCatListAdmin();renderCatSelect();
+  renderCatListAdmin();renderCatSelect();renderProdList();
 }
 function removeCategory(cat){
   window._cfg.categories=(window._cfg.categories||[]).filter(c=>c!==cat);
-  renderCatListAdmin();renderCatSelect();
+  renderCatListAdmin();renderCatSelect();renderProdList();
 }
+let adminCollapsed={};
 function renderProdList(){
-  const el=document.getElementById('prodList');el.innerHTML='';
-  if(!window._prods.length){el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:8px">Sin productos.</p>';return;}
-  window._prods.forEach(p=>{
-    const item=document.createElement('div');item.className='prod-item';
-    item.innerHTML=`<img src="${thumbOf(p)}" onerror="this.style.display='none'"/><div class="prod-item-info"><strong>${esc(p.name)}</strong><span>$${esc(p.price)} · ${esc(p.cat||'Sin cat.')} ${p.status===false?'· <span style="color:#e74c3c">No disponible</span>':''}</span></div><span style="color:var(--muted)">✏</span>`;
-    item.onclick=()=>openProductForm(p.id);
-    el.appendChild(item);
+  const el=document.getElementById('prodList');
+  const sel=document.getElementById('prodCatFilter');
+  const q=(document.getElementById('prodSearch').value||'').trim().toLowerCase();
+  const stF=document.getElementById('prodStatusFilter').value;
+  const prods=window._prods;
+  const cats=[...(window._cfg.categories||[])];
+  prods.forEach(p=>{if(p.cat&&!cats.includes(p.cat))cats.push(p.cat);});
+  const prev=sel.value||'__all';
+  sel.innerHTML='';
+  const addOpt=(v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;sel.appendChild(o);};
+  addOpt('__all','Todas las categorías ('+prods.length+')');
+  cats.forEach(c=>addOpt(c,c+' ('+prods.filter(p=>p.cat===c).length+')'));
+  const noCat=prods.filter(p=>!p.cat).length;
+  if(noCat) addOpt('__none','Sin categoría ('+noCat+')');
+  sel.value=[...sel.options].some(o=>o.value===prev)?prev:'__all';
+  const f=sel.value;
+  const list=prods.filter(p=>{
+    if(f==='__none'&&p.cat) return false;
+    if(f!=='__all'&&f!=='__none'&&p.cat!==f) return false;
+    if(stF==='on'&&p.status===false) return false;
+    if(stF==='off'&&p.status!==false) return false;
+    if(q&&!String(p.name||'').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  document.getElementById('prodCount').textContent=prods.length?'('+list.length+' de '+prods.length+')':'';
+  el.innerHTML='';
+  if(!prods.length){el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:8px">Sin productos.</p>';return;}
+  if(!list.length){el.innerHTML='<p style="color:var(--muted);font-size:13px;padding:8px">Sin resultados.</p>';return;}
+  const filtering=!!q||f!=='__all'||!!stF;
+  [...cats,''].forEach(c=>{
+    const items=list.filter(p=>(p.cat||'')===c).sort((x,y)=>String(x.name).localeCompare(String(y.name),'es'));
+    if(!items.length) return;
+    const key=c||'__none';
+    const collapsed=filtering?false:(key in adminCollapsed?adminCollapsed[key]:prods.length>15);
+    const head=document.createElement('div');head.className='prod-group-head';
+    head.innerHTML=`<span>${collapsed?'▸':'▾'} ${esc(c||'Sin categoría')}</span><span class="prod-group-n">${items.length}</span>`;
+    if(!filtering) head.onclick=()=>{adminCollapsed[key]=!collapsed;renderProdList();};
+    el.appendChild(head);
+    if(collapsed) return;
+    items.forEach(p=>{
+      const item=document.createElement('div');item.className='prod-item';
+      item.innerHTML=`<img src="${thumbOf(p)}" loading="lazy" onerror="this.style.display='none'"/><div class="prod-item-info"><strong>${esc(p.name)}</strong><span>$${esc(p.price)} ${p.status===false?'· <span style="color:#e74c3c">No disponible</span>':''}</span></div><span style="color:var(--muted)">✏</span>`;
+      item.onclick=()=>openProductForm(p.id);
+      el.appendChild(item);
+    });
   });
 }
 async function saveConfig(){
@@ -755,7 +805,7 @@ async function openProductForm(id=null){
     ['pName','pPrice','pDesc'].forEach(i=>document.getElementById(i).value='');
     currentBadges=[];
     const stEl=document.getElementById('pStatus'); if(stEl){stEl.checked=true; document.getElementById('pStatusLabel').textContent='Disponible'; document.getElementById('pStatusLabel').style.color='var(--accent)';}
-    document.getElementById('pCat').value='';
+    {const cf=document.getElementById('prodCatFilter').value;document.getElementById('pCat').value=(cf&&cf!=='__all'&&cf!=='__none')?cf:'';}
   }
   renderImgPreviews();
   document.getElementById('productOverlay').classList.add('open');
