@@ -908,7 +908,7 @@ function openRelated(id){
 
 function buildRelated(p){
   if(!p.cat) return '';
-  const related = window._prods.filter(x=>x.id!==p.id && x.cat===p.cat).slice(0,4);
+  const related = window._prods.filter(x=>x.id!==p.id && x.cat===p.cat && x.status!==false).slice(0,4);
   if(!related.length) return '';
   const cards = related.map(r=>{
     const img=thumbOf(r);
