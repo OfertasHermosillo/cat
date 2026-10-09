@@ -593,8 +593,7 @@ function dSetSlide(id,i){
   dSlideIdx[id]=i;
   const el=document.getElementById('dimgs-'+id);
   if(el) el.style.transform=`translateX(-${i*100}%)`;
-  const p=window._prods.find(x=>x.id===id);
-  const total=(p?.images||[]).length;
+  const total=el?el.children.length:0;
   for(let j=0;j<total;j++){
     const dot=document.getElementById(`ddot-${id}-${j}`);
     const thumb=document.getElementById(`dthumb-${id}-${j}`);
@@ -603,8 +602,9 @@ function dSetSlide(id,i){
   }
 }
 function dGoSlide(id,dir){
-  const p=window._prods.find(x=>x.id===id);
-  const total=(p?.images||[]).length;
+  const el=document.getElementById('dimgs-'+id);
+  const total=el?el.children.length:0;
+  if(total<2) return;
   const cur=dSlideIdx[id]||0;
   dSetSlide(id,(cur+dir+total)%total);
 }
